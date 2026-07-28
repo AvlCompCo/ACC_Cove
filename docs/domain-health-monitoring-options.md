@@ -4,6 +4,16 @@ Goal: run an automated scan (roughly daily) across all client domains covering D
 email authentication (SPF/DKIM/DMARC), MX/SMTP reachability and blacklist status, and
 alert us when something **changes** — a record edited, an IP listed, a mail server down.
 
+## Our parameters
+
+- **Scale:** 10–20 client domains once fully onboarded
+- **Retail:** ~$25/domain/month → **$250–500/mo revenue ($3,000–6,000/yr)**
+- **PSA:** SuperOps
+- **Ticketing:** SuperOps does inbound email parsing with multi-mailbox routing and
+  automation rules on From / To / Description, so **any vendor that can send an alert email
+  can create tickets for us**. Native PSA integration is a convenience, not a requirement —
+  which is important, because no DMARC vendor integrates with SuperOps natively.
+
 > **Note on sources:** `mxtoolbox.com` is blocked by the network policy in the environment
 > this was researched from, so API details below come from third-party integrations and
 > working client code, and pricing from 2026 review-site listings. Verify endpoint shapes
@@ -125,17 +135,85 @@ loose signal, not a quote.
 
 ---
 
+---
+
+## Vendor economics at 10–20 domains
+
+Cost modelled at 20 domains against $500/mo revenue. "Gross margin" is revenue minus
+platform cost — before our labour.
+
+| Vendor | Published model | Cost @ 20 domains | Per domain | Margin @ $25 | Blacklist | DNS change alerts |
+|---|---|---|---|---|---|---|
+| **DMARCeye** | Flat $4/domain/mo | **$80/mo** | $4.00 | **84%** | verify | verify |
+| **DMARC Report** (MSP partner) | Framework $100/mo list, **50% partner** → $50; no per-domain fees on paid plans | **~$50–125/mo** | $2.50–6.25 | **75–90%** | verify | verify |
+| **PowerDMARC** | Basic $8/mo (5 domains); alerts + reputation are premium/enterprise; partner pricing quoted | quoted | — | — | ✅ yes | ✅ yes |
+| **EasyDMARC** | MSP per-domain, pay-as-you-grow, no minimum — **sales-gated** | quoted | — | — | ✅ yes (Enterprise tier on business plans — verify for MSP) | ✅ yes |
+| **Red Sift OnDMARC** | Flat-rate MSP program; per-domain option for MSPs & orgs <250 users — amounts unpublished | quoted | — | — | verify | verify |
+| **DMARCTrust** | Pro $49/mo (5 domains) + $12/extra domain | **$229/mo** | $11.45 | 54% | verify | verify |
+| **dmarcian** | Enterprise $5,988/yr, up to 15 domains | **$499/mo** | ~$33 (at 15) | **negative** | verify | verify |
+
+**dmarcian's published pricing costs more per domain than we plan to charge.** Only viable
+if their partner discount is very deep — worth one email, not a pilot.
+
+### The scope trap
+
+Most of the cheap per-domain vendors are **DMARC-focused**. Our brief is broader — blacklist
+status, DNS record change detection, MX/SMTP health. Only **PowerDMARC** and **EasyDMARC**
+are confirmed to cover all three in one platform. Before shortlisting on price alone,
+confirm for each vendor:
+
+1. Does it monitor **blacklist/reputation**, or only DMARC aggregate reports?
+2. Does it alert on **any DNS record change**, or only on DMARC/SPF/DKIM records?
+3. Is either feature gated to a higher tier than the per-domain price quoted?
+
+A $4/domain tool that only does DMARC leaves us still needing the MXToolbox API for
+blacklists — which is fine (it is cheap at this scale), but it is two vendors and two alert
+paths, not one.
+
+---
+
 ## Recommendation
 
-**The decision hinges on one number: how many client domains, and what per-domain price we
-can get quoted.** Get quotes from EasyDMARC, Sendmarc, and DMARC Report before writing code.
-If a multi-tenant platform lands under roughly $1–2/domain/month with PSA ticketing
-included, buying beats building — the platform covers the check table, feeds tickets into
-our PSA automatically, and gives us a white-labelled client report we can actually sell.
-Building only wins if per-domain pricing is prohibitive at our client count, or if we want
-the checks MXToolbox and the DMARC vendors both skip (nameserver delegation, domain expiry).
+**Buy, don't build.** At 10–20 domains the entire revenue line is $3–6k/yr. Any meaningful
+engineering time against that is a loss, and the ongoing maintenance — DNSBL zone churn,
+false positives, alert plumbing — never stops. The custom scanner (Options B/C above) only
+made sense at a much larger domain count. Shelve it.
 
-**If we build: Option C as the core, Option B for blacklists, Option D on top for DMARC.**
+**Shortlist to quote, in priority order:**
+
+1. **PowerDMARC** — confirmed full scope (DMARC + blacklist/reputation + DNS change alerts),
+   white-label, partner program with no contract commitment. Ask specifically what tier
+   unlocks Alerts and Reputation Monitoring at partner pricing, since both are premium
+   features on retail plans.
+2. **EasyDMARC** — same confirmed scope, best-in-class UI and onboarding. Ask whether
+   Reputation Monitoring is included in MSP per-domain pricing or an add-on. Note their PSA
+   integration list (ConnectWise/Autotask/Halo/Syncro) does **not** include SuperOps, so we
+   lose their headline MSP differentiator and fall back to email-to-ticket like everyone else.
+3. **DMARC Report** — best published partner economics (50% off, no per-domain fees). Confirm
+   the domain limit on the Framework tier and whether blacklist/DNS-change monitoring is in
+   scope or DMARC-only.
+4. **DMARCeye** — cheapest clean per-domain model at $4 flat with white-label client logins.
+   Confirm scope beyond DMARC.
+5. **Red Sift OnDMARC** — flat-rate MSP pricing is the most predictable structure as we grow
+   past 20 domains. Worth a quote even if it loses today.
+
+**Skip:** dmarcian on published pricing, and MXToolbox Delivery Center — 5-domain buckets at
+$129/mo means 20 domains costs ~$516/mo, which erases the entire margin.
+
+### Watch for
+
+- **Minimums and floors.** Several partner programs are built for 50–200+ domain MSPs.
+  At 10–20 we may be below the tier where partner pricing is offered at all — ask directly
+  rather than assuming the published partner rate applies to us.
+- **Per-domain vs per-plan.** DMARC Report's "no per-domain fees" is the most favourable
+  structure at our size *if* the domain cap on the entry tier clears 20. Verify.
+- **Email alert quality.** Since everything routes through SuperOps email parsing, the alert
+  emails need consistent, parseable subjects/bodies to map cleanly to the right client.
+  Ask each vendor for a sample alert email during the trial.
+
+### If we build instead (not recommended at this scale)
+
+**Option C as the core, Option B for blacklists, Option D on top for DMARC.**
 
 1. Build a scheduled scanner in this repo. One row per client domain, one JSON snapshot per
    scan, diff-on-write.
