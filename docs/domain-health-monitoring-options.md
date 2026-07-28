@@ -91,25 +91,51 @@ Most of what MXToolbox reports is *just DNS queries* and free to run ourselves:
 So: build the record/diff engine ourselves, and use the MXToolbox API only for blacklist
 aggregation (and optionally SMTP diagnostics). Cheapest at scale, most code to write.
 
-### Option D — A multi-tenant competitor instead
-If the real goal includes **DMARC aggregate (RUA) reporting** — which MXToolbox is weak at —
-these are built for MSPs with per-client tenancy and white-labelling:
+### Option D — A multi-tenant MSP platform instead
 
-- **EasyDMARC** — explicit MSP/partner program, per-domain tiers
-- **PowerDMARC** — white-label MSP offering, client sub-accounts
-- **dmarcian** — strong DMARC tooling, per-domain pricing
-- **Valimail** — enterprise, free tier for DMARC monitoring
-- **Postmark DMARC** — free weekly DMARC digest, no monitoring beyond that
+These are built for MSPs with per-client tenancy, white-labelling, and PSA ticketing. They
+add **DMARC aggregate (RUA) reporting** — which MXToolbox is weak at — on top of the
+monitoring scope above. RUA parsing tells us *who is sending as the client and whether it
+passes*, which is different information from "is the record present," and it is the thing
+clients actually get breached over.
 
-DMARC RUA parsing tells us who is sending as the client and whether it passes — genuinely
-different information from "is the record present," and it is the thing clients actually get
-breached over.
+| Vendor | MSP economics | Notable |
+|---|---|---|
+| **EasyDMARC** | Per-domain "pay-as-you-grow", monthly, no minimum commit or setup fee. **Not published — sales-gated.** | Cleanest UI, fastest onboarding, PSA integrations for ConnectWise / Autotask / HaloPSA / SyncroMSP |
+| **DMARC Report** | 50% off list for partners (published) | White-label multi-tenant, dedicated onboarding |
+| **Red Sift OnDMARC** | Flat-rate MSP pricing (predictable at scale) | API-first, Dynamic SPF |
+| **PowerDMARC** | Channel partner program | White-label, deep API, 1,000+ partners |
+| **Sendmarc** | Partner-first | Certified ConnectWise PSA integration, 90-day compliance guarantee |
+| **dmarcian** | Lower price point | Strong source classification, good educational material |
+| **Postmark DMARC** | Free | Weekly DMARC digest only, no other monitoring |
+
+**Important scope correction:** EasyDMARC is *not* DMARC-only. It also does blacklist /
+reputation monitoring and DNS change alerts, which means it covers most of the check table
+below on its own — it is a plausible full replacement for the MXToolbox scope, not just a
+complement to it. **Caveat to verify:** on the published *business* tiers, Reputation
+(blacklist) Monitoring appears to be an Enterprise-tier feature. Confirm whether it is
+included in MSP per-domain pricing or billed as an add-on — that single answer moves the
+build-vs-buy decision.
+
+Published EasyDMARC business pricing, for reference only (MSP pricing is separate and
+quoted): Free tier; Plus ~$35.99/mo annual (~$44.99 monthly) for 2 domains; Premium
+~$71.99/mo for 4 domains; Enterprise quoted. Third-party sources put full MSP client
+packages at roughly $5,000–$15,000/yr depending on domain count — treat that as a very
+loose signal, not a quote.
 
 ---
 
 ## Recommendation
 
-**Hybrid: Option C as the core, Option B for blacklists, Option D if we want DMARC data.**
+**The decision hinges on one number: how many client domains, and what per-domain price we
+can get quoted.** Get quotes from EasyDMARC, Sendmarc, and DMARC Report before writing code.
+If a multi-tenant platform lands under roughly $1–2/domain/month with PSA ticketing
+included, buying beats building — the platform covers the check table, feeds tickets into
+our PSA automatically, and gives us a white-labelled client report we can actually sell.
+Building only wins if per-domain pricing is prohibitive at our client count, or if we want
+the checks MXToolbox and the DMARC vendors both skip (nameserver delegation, domain expiry).
+
+**If we build: Option C as the core, Option B for blacklists, Option D on top for DMARC.**
 
 1. Build a scheduled scanner in this repo. One row per client domain, one JSON snapshot per
    scan, diff-on-write.
